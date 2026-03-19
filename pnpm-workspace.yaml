@@ -1,0 +1,5 @@
+packages:
+  - "sdk/client"
+  - "sdk/server"
+  - "demo/service"
+  - "demo/agent"

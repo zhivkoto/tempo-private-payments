@@ -1,0 +1,10 @@
+{
+  "name": "cmpp",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "test:contracts": "cd contracts && forge test -vvv"
+  }
+}
