@@ -14,9 +14,11 @@ import {IStealthAnnouncer} from "./interfaces/IStealthAnnouncer.sol";
 ///      interface callable via a standard low-level call to the token's precompile address.
 contract StealthAnnouncer is IStealthAnnouncer {
     address public owner;
+    address public pendingOwner;
     uint256 public override announcementFee;
     address public override feeToken;
     address public override treasury;
+    uint256 public override maxMetadataSize;
 
     modifier onlyOwner() {
         require(msg.sender == owner, "StealthAnnouncer: not owner");
@@ -33,6 +35,9 @@ contract StealthAnnouncer is IStealthAnnouncer {
         feeToken = _feeToken;
         announcementFee = _announcementFee;
         treasury = _treasury;
+        maxMetadataSize = 1024; // Default: 1024 bytes
+
+        emit OwnershipTransferred(address(0), msg.sender);
     }
 
     /// @inheritdoc IStealthAnnouncer
@@ -45,6 +50,7 @@ contract StealthAnnouncer is IStealthAnnouncer {
     ) external {
         require(stealthAddress != address(0), "StealthAnnouncer: zero stealth address");
         require(ephemeralPubKey.length == 33, "StealthAnnouncer: invalid ephemeral pubkey length");
+        require(metadata.length <= maxMetadataSize, "StealthAnnouncer: metadata too large");
 
         // Collect fee via TIP-20 transferFrom
         if (announcementFee > 0) {
@@ -67,19 +73,38 @@ contract StealthAnnouncer is IStealthAnnouncer {
 
     /// @inheritdoc IStealthAnnouncer
     function setAnnouncementFee(uint256 newFee) external onlyOwner {
+        uint256 oldFee = announcementFee;
         announcementFee = newFee;
+        emit AnnouncementFeeUpdated(oldFee, newFee);
     }
 
     /// @inheritdoc IStealthAnnouncer
     function setTreasury(address newTreasury) external onlyOwner {
         require(newTreasury != address(0), "StealthAnnouncer: zero treasury");
+        address oldTreasury = treasury;
         treasury = newTreasury;
+        emit TreasuryUpdated(oldTreasury, newTreasury);
     }
 
-    /// @notice Transfer ownership.
-    /// @param newOwner The new owner address.
+    /// @inheritdoc IStealthAnnouncer
+    function setMaxMetadataSize(uint256 newSize) external onlyOwner {
+        uint256 oldSize = maxMetadataSize;
+        maxMetadataSize = newSize;
+        emit MaxMetadataSizeUpdated(oldSize, newSize);
+    }
+
+    /// @inheritdoc IStealthAnnouncer
     function transferOwnership(address newOwner) external onlyOwner {
         require(newOwner != address(0), "StealthAnnouncer: zero owner");
-        owner = newOwner;
+        pendingOwner = newOwner;
+        emit OwnershipTransferStarted(owner, newOwner);
+    }
+
+    /// @inheritdoc IStealthAnnouncer
+    function acceptOwnership() external {
+        require(msg.sender == pendingOwner, "StealthAnnouncer: not pending owner");
+        emit OwnershipTransferred(owner, pendingOwner);
+        owner = pendingOwner;
+        pendingOwner = address(0);
     }
 }

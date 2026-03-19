@@ -17,6 +17,12 @@ interface IStealthRegistry {
         bytes stealthMetaAddress
     );
 
+    /// @notice Emitted when ownership transfer is initiated.
+    event OwnershipTransferStarted(address indexed previousOwner, address indexed newOwner);
+
+    /// @notice Emitted when ownership transfer is completed.
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
     /// @notice Register or update your stealth meta-address for a given scheme.
     /// @param schemeId The scheme identifier. Must be > 0.
     /// @param stealthMetaAddress The stealth meta-address bytes.
@@ -34,4 +40,11 @@ interface IStealthRegistry {
         address registrant,
         uint256 schemeId
     ) external view returns (bytes memory);
+
+    /// @notice Owner-only: initiate ownership transfer.
+    /// @param newOwner The pending new owner address.
+    function transferOwnership(address newOwner) external;
+
+    /// @notice Accept pending ownership transfer. Must be called by the pending owner.
+    function acceptOwnership() external;
 }

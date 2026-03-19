@@ -7,9 +7,23 @@ import {IStealthRegistry} from "./interfaces/IStealthRegistry.sol";
 /// @notice Singleton registry mapping (address, schemeId) => stealth meta-address.
 /// @dev Adapted from ERC-6538 for Tempo. No access control on reads.
 ///      Only the registrant can set their own meta-address.
+///      Ownership is used for potential future admin functions.
 contract StealthRegistry is IStealthRegistry {
+    address public owner;
+    address public pendingOwner;
+
     /// @dev mapping(registrant => mapping(schemeId => stealthMetaAddress))
     mapping(address => mapping(uint256 => bytes)) private _metaAddresses;
+
+    constructor() {
+        owner = msg.sender;
+        emit OwnershipTransferred(address(0), msg.sender);
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "StealthRegistry: not owner");
+        _;
+    }
 
     /// @inheritdoc IStealthRegistry
     function registerStealthMetaAddress(
@@ -37,5 +51,20 @@ contract StealthRegistry is IStealthRegistry {
         uint256 schemeId
     ) external view returns (bytes memory) {
         return _metaAddresses[registrant][schemeId];
+    }
+
+    /// @inheritdoc IStealthRegistry
+    function transferOwnership(address newOwner) external onlyOwner {
+        require(newOwner != address(0), "StealthRegistry: zero owner");
+        pendingOwner = newOwner;
+        emit OwnershipTransferStarted(owner, newOwner);
+    }
+
+    /// @inheritdoc IStealthRegistry
+    function acceptOwnership() external {
+        require(msg.sender == pendingOwner, "StealthRegistry: not pending owner");
+        emit OwnershipTransferred(owner, pendingOwner);
+        owner = pendingOwner;
+        pendingOwner = address(0);
     }
 }

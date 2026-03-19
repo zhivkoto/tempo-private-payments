@@ -7,6 +7,7 @@ import "../src/interfaces/IStealthRegistry.sol";
 
 contract StealthRegistryTest is Test {
     StealthRegistry public registry;
+    address public deployer = makeAddr("deployer");
     address public alice = makeAddr("alice");
 
     // Valid scheme 1 meta-address: two compressed secp256k1 pubkeys (33 + 33 = 66 bytes)
@@ -18,8 +19,11 @@ contract StealthRegistryTest is Test {
     );
 
     function setUp() public {
+        vm.prank(deployer);
         registry = new StealthRegistry();
     }
+
+    // ========== Existing tests ==========
 
     function test_registerAndRetrieve() public {
         vm.prank(alice);
@@ -89,5 +93,110 @@ contract StealthRegistryTest is Test {
             keccak256(registry.stealthMetaAddressOf(alice, 2)),
             keccak256(bytes("arbitrary-scheme-2-data"))
         );
+    }
+
+    // ========== M-1: Two-step ownership transfer tests ==========
+
+    function test_transferOwnership_twoStep() public {
+        address newOwner = makeAddr("newOwner");
+
+        // Step 1: Current owner initiates transfer
+        vm.prank(deployer);
+        registry.transferOwnership(newOwner);
+
+        // Owner should NOT have changed yet
+        assertEq(registry.owner(), deployer);
+        assertEq(registry.pendingOwner(), newOwner);
+
+        // Step 2: New owner accepts
+        vm.prank(newOwner);
+        registry.acceptOwnership();
+
+        assertEq(registry.owner(), newOwner);
+        assertEq(registry.pendingOwner(), address(0));
+    }
+
+    function test_transferOwnership_emitsStartedEvent() public {
+        address newOwner = makeAddr("newOwner");
+
+        vm.expectEmit(true, true, false, true);
+        emit IStealthRegistry.OwnershipTransferStarted(deployer, newOwner);
+
+        vm.prank(deployer);
+        registry.transferOwnership(newOwner);
+    }
+
+    function test_acceptOwnership_emitsTransferredEvent() public {
+        address newOwner = makeAddr("newOwner");
+
+        vm.prank(deployer);
+        registry.transferOwnership(newOwner);
+
+        vm.expectEmit(true, true, false, true);
+        emit IStealthRegistry.OwnershipTransferred(deployer, newOwner);
+
+        vm.prank(newOwner);
+        registry.acceptOwnership();
+    }
+
+    function test_revert_acceptOwnership_notPending() public {
+        address newOwner = makeAddr("newOwner");
+
+        vm.prank(deployer);
+        registry.transferOwnership(newOwner);
+
+        // Random address tries to accept
+        vm.prank(alice);
+        vm.expectRevert("StealthRegistry: not pending owner");
+        registry.acceptOwnership();
+    }
+
+    function test_revert_acceptOwnership_noPending() public {
+        vm.prank(alice);
+        vm.expectRevert("StealthRegistry: not pending owner");
+        registry.acceptOwnership();
+    }
+
+    function test_transferOwnership_revert_zeroAddress() public {
+        vm.prank(deployer);
+        vm.expectRevert("StealthRegistry: zero owner");
+        registry.transferOwnership(address(0));
+    }
+
+    function test_transferOwnership_revert_notOwner() public {
+        vm.prank(alice);
+        vm.expectRevert("StealthRegistry: not owner");
+        registry.transferOwnership(alice);
+    }
+
+    function test_constructor_emitsOwnershipTransferred() public {
+        vm.expectEmit(true, true, false, true);
+        emit IStealthRegistry.OwnershipTransferred(address(0), address(this));
+
+        new StealthRegistry();
+    }
+
+    function test_transferOwnership_overwritePending() public {
+        address newOwner1 = makeAddr("newOwner1");
+        address newOwner2 = makeAddr("newOwner2");
+
+        vm.prank(deployer);
+        registry.transferOwnership(newOwner1);
+
+        // Owner changes their mind
+        vm.prank(deployer);
+        registry.transferOwnership(newOwner2);
+
+        assertEq(registry.pendingOwner(), newOwner2);
+
+        // First candidate can no longer accept
+        vm.prank(newOwner1);
+        vm.expectRevert("StealthRegistry: not pending owner");
+        registry.acceptOwnership();
+
+        // Second candidate can
+        vm.prank(newOwner2);
+        registry.acceptOwnership();
+        assertEq(registry.owner(), newOwner2);
     }
 }

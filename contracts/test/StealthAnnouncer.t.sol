@@ -58,6 +58,8 @@ contract StealthAnnouncerTest is Test {
         token.approve(address(announcer), type(uint256).max);
     }
 
+    // ========== Existing tests ==========
+
     function test_announce_emitsEvent() public {
         vm.expectEmit(true, true, true, true);
         emit IStealthAnnouncer.Announcement(
@@ -143,21 +145,6 @@ contract StealthAnnouncerTest is Test {
         announcer.setTreasury(address(0));
     }
 
-    function test_transferOwnership() public {
-        vm.prank(deployer);
-        announcer.transferOwnership(alice);
-        assertEq(announcer.owner(), alice);
-
-        // Old owner can no longer call
-        vm.prank(deployer);
-        vm.expectRevert("StealthAnnouncer: not owner");
-        announcer.setAnnouncementFee(0);
-
-        // New owner can
-        vm.prank(alice);
-        announcer.setAnnouncementFee(0);
-    }
-
     function test_multipleAnnouncements() public {
         // Verify multiple announcements work and fees accumulate
         vm.startPrank(alice);
@@ -167,5 +154,214 @@ contract StealthAnnouncerTest is Test {
         vm.stopPrank();
 
         assertEq(token.balanceOf(treasury), FEE * 3);
+    }
+
+    // ========== M-1: Two-step ownership transfer tests ==========
+
+    function test_transferOwnership_twoStep() public {
+        address newOwner = makeAddr("newOwner");
+
+        // Step 1: Current owner initiates transfer
+        vm.prank(deployer);
+        announcer.transferOwnership(newOwner);
+
+        // Owner should NOT have changed yet
+        assertEq(announcer.owner(), deployer);
+        assertEq(announcer.pendingOwner(), newOwner);
+
+        // Step 2: New owner accepts
+        vm.prank(newOwner);
+        announcer.acceptOwnership();
+
+        assertEq(announcer.owner(), newOwner);
+        assertEq(announcer.pendingOwner(), address(0));
+    }
+
+    function test_transferOwnership_emitsStartedEvent() public {
+        address newOwner = makeAddr("newOwner");
+
+        vm.expectEmit(true, true, false, true);
+        emit IStealthAnnouncer.OwnershipTransferStarted(deployer, newOwner);
+
+        vm.prank(deployer);
+        announcer.transferOwnership(newOwner);
+    }
+
+    function test_acceptOwnership_emitsTransferredEvent() public {
+        address newOwner = makeAddr("newOwner");
+
+        vm.prank(deployer);
+        announcer.transferOwnership(newOwner);
+
+        vm.expectEmit(true, true, false, true);
+        emit IStealthAnnouncer.OwnershipTransferred(deployer, newOwner);
+
+        vm.prank(newOwner);
+        announcer.acceptOwnership();
+    }
+
+    function test_revert_acceptOwnership_notPending() public {
+        address newOwner = makeAddr("newOwner");
+
+        vm.prank(deployer);
+        announcer.transferOwnership(newOwner);
+
+        // Random address tries to accept
+        vm.prank(alice);
+        vm.expectRevert("StealthAnnouncer: not pending owner");
+        announcer.acceptOwnership();
+    }
+
+    function test_revert_acceptOwnership_noPending() public {
+        // No transfer initiated — pendingOwner is address(0)
+        vm.prank(alice);
+        vm.expectRevert("StealthAnnouncer: not pending owner");
+        announcer.acceptOwnership();
+    }
+
+    function test_transferOwnership_revert_zeroAddress() public {
+        vm.prank(deployer);
+        vm.expectRevert("StealthAnnouncer: zero owner");
+        announcer.transferOwnership(address(0));
+    }
+
+    function test_transferOwnership_revert_notOwner() public {
+        vm.prank(alice);
+        vm.expectRevert("StealthAnnouncer: not owner");
+        announcer.transferOwnership(alice);
+    }
+
+    function test_transferOwnership_oldOwnerLosesAccess() public {
+        address newOwner = makeAddr("newOwner");
+
+        vm.prank(deployer);
+        announcer.transferOwnership(newOwner);
+
+        vm.prank(newOwner);
+        announcer.acceptOwnership();
+
+        // Old owner can no longer call admin functions
+        vm.prank(deployer);
+        vm.expectRevert("StealthAnnouncer: not owner");
+        announcer.setAnnouncementFee(0);
+
+        // New owner can
+        vm.prank(newOwner);
+        announcer.setAnnouncementFee(0);
+    }
+
+    function test_transferOwnership_overwritePending() public {
+        address newOwner1 = makeAddr("newOwner1");
+        address newOwner2 = makeAddr("newOwner2");
+
+        vm.prank(deployer);
+        announcer.transferOwnership(newOwner1);
+
+        // Owner changes their mind, initiates new transfer
+        vm.prank(deployer);
+        announcer.transferOwnership(newOwner2);
+
+        assertEq(announcer.pendingOwner(), newOwner2);
+
+        // First candidate can no longer accept
+        vm.prank(newOwner1);
+        vm.expectRevert("StealthAnnouncer: not pending owner");
+        announcer.acceptOwnership();
+
+        // Second candidate can
+        vm.prank(newOwner2);
+        announcer.acceptOwnership();
+        assertEq(announcer.owner(), newOwner2);
+    }
+
+    // ========== M-2: Admin state change events tests ==========
+
+    function test_setAnnouncementFee_emitsEvent() public {
+        vm.expectEmit(false, false, false, true);
+        emit IStealthAnnouncer.AnnouncementFeeUpdated(FEE, 2000);
+
+        vm.prank(deployer);
+        announcer.setAnnouncementFee(2000);
+    }
+
+    function test_setTreasury_emitsEvent() public {
+        address newTreasury = makeAddr("newTreasury");
+
+        vm.expectEmit(true, true, false, true);
+        emit IStealthAnnouncer.TreasuryUpdated(treasury, newTreasury);
+
+        vm.prank(deployer);
+        announcer.setTreasury(newTreasury);
+    }
+
+    function test_constructor_emitsOwnershipTransferred() public {
+        vm.expectEmit(true, true, false, true);
+        emit IStealthAnnouncer.OwnershipTransferred(address(0), address(this));
+
+        new StealthAnnouncer(address(token), FEE, treasury);
+    }
+
+    // ========== M-3: Metadata size cap tests ==========
+
+    function test_maxMetadataSize_default() public view {
+        assertEq(announcer.maxMetadataSize(), 1024);
+    }
+
+    function test_announce_metadataAtLimit() public {
+        bytes memory metadata = new bytes(1024);
+        // Fill with non-zero data
+        for (uint256 i = 0; i < 1024; i++) {
+            metadata[i] = 0x42;
+        }
+
+        vm.prank(alice);
+        announcer.announce(1, stealthAddr, ephemeralPubKey, 0x42, metadata);
+    }
+
+    function test_revert_announce_metadataTooLarge() public {
+        bytes memory metadata = new bytes(1025);
+
+        vm.prank(alice);
+        vm.expectRevert("StealthAnnouncer: metadata too large");
+        announcer.announce(1, stealthAddr, ephemeralPubKey, 0x42, metadata);
+    }
+
+    function test_setMaxMetadataSize() public {
+        vm.prank(deployer);
+        announcer.setMaxMetadataSize(2048);
+        assertEq(announcer.maxMetadataSize(), 2048);
+
+        // Now 1025 bytes should be fine
+        bytes memory metadata = new bytes(1025);
+        vm.prank(alice);
+        announcer.announce(1, stealthAddr, ephemeralPubKey, 0x42, metadata);
+    }
+
+    function test_setMaxMetadataSize_emitsEvent() public {
+        vm.expectEmit(false, false, false, true);
+        emit IStealthAnnouncer.MaxMetadataSizeUpdated(1024, 2048);
+
+        vm.prank(deployer);
+        announcer.setMaxMetadataSize(2048);
+    }
+
+    function test_setMaxMetadataSize_onlyOwner() public {
+        vm.prank(alice);
+        vm.expectRevert("StealthAnnouncer: not owner");
+        announcer.setMaxMetadataSize(2048);
+    }
+
+    function test_setMaxMetadataSize_zero_blocksMetadata() public {
+        vm.prank(deployer);
+        announcer.setMaxMetadataSize(0);
+
+        // Empty metadata should still work
+        vm.prank(alice);
+        announcer.announce(1, stealthAddr, ephemeralPubKey, 0x42, bytes(""));
+
+        // Any metadata should fail
+        vm.prank(alice);
+        vm.expectRevert("StealthAnnouncer: metadata too large");
+        announcer.announce(1, stealthAddr, ephemeralPubKey, 0x42, bytes("x"));
     }
 }
