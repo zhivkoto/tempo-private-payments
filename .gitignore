@@ -5,3 +5,9 @@ cache/
 out/
 node_modules/
 *.key
+
+sdk/rust/target/
+sdk/python/*.egg-info/
+sdk/python/pympp/__pycache__/
+sdk/python/tests/__pycache__/
+sdk/server/dist/
