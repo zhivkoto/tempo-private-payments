@@ -64,11 +64,11 @@ jobs:
       - name: Build SDK packages
         run: pnpm --filter @cmpp/client run build && pnpm --filter @cmpp/server run build
       - name: Express tests
-        run: cd middleware/express && pnpm test
+        run: pnpm --filter @cmpp/express test
       - name: Next.js tests
-        run: cd middleware/nextjs && pnpm test
+        run: pnpm --filter @cmpp/nextjs test
       - name: Elysia tests
-        run: cd middleware/elysia && pnpm test
+        run: pnpm --filter @cmpp/elysia test
 
   scanning-service:
     name: Scanning Service

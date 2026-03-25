@@ -141,9 +141,10 @@ export async function executeConfidentialCharge(params: {
   });
 
   const txHash = await walletClient.sendTransaction({
+    chain: walletClient.chain ?? null,
     to: tokenAddress,
     data: transferData,
-  });
+  } as any);
 
   // Wait for transfer confirmation
   await publicClient.waitForTransactionReceipt({ hash: txHash });
@@ -167,9 +168,10 @@ export async function executeConfidentialCharge(params: {
   });
 
   const announcementTxHash = await walletClient.sendTransaction({
+    chain: walletClient.chain ?? null,
     to: announcerAddress,
     data: announceData,
-  });
+  } as any);
 
   // Wait for announcement confirmation
   await publicClient.waitForTransactionReceipt({ hash: announcementTxHash });
