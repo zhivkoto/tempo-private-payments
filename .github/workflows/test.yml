@@ -1,0 +1,89 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  typescript:
+    name: TypeScript SDK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install client deps
+        run: cd sdk/client && npm ci
+      - name: Run client tests
+        run: cd sdk/client && npm test
+      - name: Install server deps
+        run: cd sdk/server && npm ci
+      - name: Run server tests
+        run: cd sdk/server && npm test
+
+  python:
+    name: Python SDK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install deps
+        run: cd sdk/python && pip install -e '.[dev]'
+      - name: Run tests
+        run: cd sdk/python && pytest tests/ -v
+
+  rust:
+    name: Rust SDK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run tests
+        run: cd sdk/rust && cargo test -- --nocapture
+      - name: Clippy
+        run: cd sdk/rust && cargo clippy -- -D warnings
+
+  middleware:
+    name: Middleware
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Express tests
+        run: cd middleware/express && npm ci && npm test
+      - name: Next.js tests
+        run: cd middleware/nextjs && npm ci && npm test
+      - name: Elysia tests
+        run: cd middleware/elysia && npm ci && npm test
+
+  scanning-service:
+    name: Scanning Service
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install deps
+        run: cd scanning-service && npm ci
+      - name: Run tests
+        run: cd scanning-service && npm test
+
+  contracts:
+    name: Solidity Contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+      - name: Run tests
+        run: cd contracts && forge test -vvv
