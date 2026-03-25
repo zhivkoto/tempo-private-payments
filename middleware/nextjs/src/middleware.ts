@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import { createConfidentialChargeMethod } from "@cmpp/server";
 import type { ConfidentialChargeConfig } from "@cmpp/server";
 
@@ -14,6 +15,10 @@ export interface StealthMiddlewareConfig extends ConfidentialChargeConfig {
  *
  * This runs at the edge before your route handlers. Requests to protected
  * paths without valid payment credentials receive a 402 challenge.
+ *
+ * H-MW-2: When credential is valid, returns NextResponse.next() with
+ * X-Payment-Id, X-Payment-Status, and X-Payment-Stealth-Address headers
+ * so route handlers can identify paid requests.
  *
  * @example
  * ```ts
@@ -36,7 +41,7 @@ export function createStealthMiddleware(config: StealthMiddlewareConfig) {
   const method = createConfidentialChargeMethod(config);
   const protectedPaths = config.protectedPaths;
 
-  return async (request: Request): Promise<Response | undefined> => {
+  return async (request: Request): Promise<Response | NextResponse> => {
     // Check if this path should be gated
     if (protectedPaths && protectedPaths.length > 0) {
       const url = new URL(request.url);
@@ -44,7 +49,7 @@ export function createStealthMiddleware(config: StealthMiddlewareConfig) {
         url.pathname.startsWith(p)
       );
       if (!isProtected) {
-        return undefined; // Let Next.js continue
+        return NextResponse.next();
       }
     }
 
@@ -80,7 +85,25 @@ export function createStealthMiddleware(config: StealthMiddlewareConfig) {
       );
     }
 
-    // Valid — let the request through (Next.js edge middleware returns undefined to continue)
-    return undefined;
+    // H-MW-2: Propagate payment context to route handlers via request headers.
+    // NextResponse.next() forwards the request with modified headers so route
+    // handlers can read payment info without needing shared state.
+    const response = NextResponse.next({
+      request: {
+        headers: new Headers({
+          ...Object.fromEntries(request.headers.entries()),
+          "X-Payment-Id": result.paymentId,
+          "X-Payment-Status": "settled",
+          "X-Payment-Stealth-Address": result.payment.stealthAddress,
+        }),
+      },
+    });
+
+    response.headers.set(
+      "Payment-Receipt",
+      `id="${result.paymentId}", status="settled"`
+    );
+
+    return response;
   };
 }
