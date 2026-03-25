@@ -1,0 +1,20 @@
+{
+  "comment": "Deterministic test vectors for ERC-5564 stealth address scheme (secp256k1, keccak256). All hex values are 0x-prefixed. The ephemeral private key is fixed so that derivation is fully deterministic.",
+  "keys": {
+    "spending_private_key": "0x0000000000000000000000000000000000000000000000000000000000000001",
+    "spending_public_key": "0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+    "viewing_private_key": "0x0000000000000000000000000000000000000000000000000000000000000002",
+    "viewing_public_key": "0x02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+    "ephemeral_private_key": "0x0000000000000000000000000000000000000000000000000000000000000003",
+    "ephemeral_public_key": "0x02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9"
+  },
+  "meta_address": "0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179802c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+  "expected": {
+    "shared_secret_point": "0x03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556",
+    "shared_secret_hash": "0xcd36b55d26196fc0b96312b01dd978fc5e380c8afeab49aae283f0ca6a814ff4",
+    "view_tag": 205,
+    "shared_secret_scalar": "0xcd36b55d26196fc0b96312b01dd978fc5e380c8afeab49aae283f0ca6a814ff4",
+    "stealth_address": "0x7f7d3bae345ae700dcda65d1b1f98f43835a17c4",
+    "stealth_private_key": "0xcd36b55d26196fc0b96312b01dd978fc5e380c8afeab49aae283f0ca6a814ff5"
+  }
+}
