@@ -16,8 +16,8 @@ export interface StealthPaymentContext {
 /**
  * Elysia plugin that gates routes behind stealth address payments.
  *
- * Uses `.onBeforeHandle()` to enforce the 402 → payment → credential → 200
- * flow and `.resolve()` to expose payment context to handlers.
+ * H-MW-1: Uses derive() for per-request payment context instead of shared
+ * store, preventing race conditions under concurrent requests.
  *
  * @example
  * ```ts
@@ -44,9 +44,7 @@ export function stealthPayment<T extends Elysia<any, any, any, any, any, any, an
   const method = createConfidentialChargeMethod(config);
 
   return app
-    .state("_stealthPaymentId", "" as string)
-    .state("_stealthPaymentDetails", null as DetectedPayment | null)
-    .onBeforeHandle(async ({ set, headers, store }) => {
+    .derive(async ({ headers, set }) => {
       const authHeader = headers["authorization"];
 
       // No auth → 402 challenge
@@ -55,8 +53,8 @@ export function stealthPayment<T extends Elysia<any, any, any, any, any, any, an
         set.status = 402;
         set.headers["WWW-Authenticate"] = challenge;
         return {
-          error: "Payment Required",
-          message: "This endpoint requires a confidential payment.",
+          payment: null as StealthPaymentContext | null,
+          _paymentBlocked: true,
         };
       }
 
@@ -68,23 +66,28 @@ export function stealthPayment<T extends Elysia<any, any, any, any, any, any, an
         set.status = 402;
         set.headers["WWW-Authenticate"] = challenge;
         return {
-          error: "Payment Required",
-          message: result.error || "Invalid or expired credential.",
+          payment: null as StealthPaymentContext | null,
+          _paymentBlocked: true,
         };
       }
 
-      // Valid — store payment info for resolve
-      store._stealthPaymentId = result.paymentId;
-      store._stealthPaymentDetails = result.payment;
+      // Valid — attach per-request payment context
       set.headers["Payment-Receipt"] =
         `id="${result.paymentId}", status="settled"`;
+      return {
+        payment: {
+          paymentId: result.paymentId,
+          details: result.payment,
+        } as StealthPaymentContext | null,
+        _paymentBlocked: false,
+      };
     })
-    .resolve(({ store }) => ({
-      payment: store._stealthPaymentId
-        ? ({
-            paymentId: store._stealthPaymentId,
-            details: store._stealthPaymentDetails!,
-          } as StealthPaymentContext)
-        : (null as StealthPaymentContext | null),
-    }));
+    .onBeforeHandle(({ _paymentBlocked, set }) => {
+      if (_paymentBlocked) {
+        return {
+          error: "Payment Required",
+          message: "This endpoint requires a confidential payment.",
+        };
+      }
+    });
 }
