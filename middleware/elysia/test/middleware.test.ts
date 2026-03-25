@@ -21,6 +21,17 @@ const mockPayment: DetectedPayment = {
   detectedAt: new Date(),
 };
 
+const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+const mockTransferLog = {
+  address: TOKEN_ADDRESS,
+  topics: [
+    TRANSFER_TOPIC,
+    "0x0000000000000000000000001111111111111111111111111111111111111111",
+    `0x000000000000000000000000${mockPayment.stealthAddress.slice(2)}`,
+  ],
+  data: `0x${AMOUNT.toString(16).padStart(64, "0")}`,
+};
+
 function createMockScanner(
   verifyResult: DetectedPayment | null = mockPayment
 ): AnnouncementScanner {
@@ -30,6 +41,11 @@ function createMockScanner(
     stop: vi.fn(),
     getLastScannedBlock: vi.fn().mockReturnValue(0n),
     scanRange: vi.fn().mockResolvedValue([]),
+    getPublicClient: vi.fn().mockReturnValue({
+      getTransactionReceipt: vi.fn().mockResolvedValue({
+        logs: verifyResult ? [mockTransferLog] : [],
+      }),
+    }),
   } as unknown as AnnouncementScanner;
 }
 
@@ -108,7 +124,8 @@ describe("stealthPayment Elysia plugin", () => {
     // Build credential
     const txHash = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const credential = base64urlEncode(txHash);
-    const authHeader = `Payment id="${challenge["id"]}", credential="${credential}"`;
+    const nonce = challenge["nonce"];
+    const authHeader = `Payment id="${challenge["id"]}", credential="${credential}", nonce="${nonce}"`;
 
     const res = await app.handle(
       new Request("http://localhost/api/data", {
@@ -158,7 +175,8 @@ describe("stealthPayment Elysia plugin", () => {
     const credential = base64urlEncode(
       "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     );
-    const authHeader = `Payment id="${challenge["id"]}", credential="${credential}"`;
+    const nonce = challenge["nonce"];
+    const authHeader = `Payment id="${challenge["id"]}", credential="${credential}", nonce="${nonce}"`;
 
     const res = await app.handle(
       new Request("http://localhost/api/data", {

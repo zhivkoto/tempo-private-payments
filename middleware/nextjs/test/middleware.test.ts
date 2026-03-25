@@ -21,6 +21,17 @@ const mockPayment: DetectedPayment = {
   detectedAt: new Date(),
 };
 
+const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+const mockTransferLog = {
+  address: TOKEN_ADDRESS,
+  topics: [
+    TRANSFER_TOPIC,
+    "0x0000000000000000000000001111111111111111111111111111111111111111",
+    `0x000000000000000000000000${mockPayment.stealthAddress.slice(2)}`,
+  ],
+  data: `0x${AMOUNT.toString(16).padStart(64, "0")}`,
+};
+
 function createMockScanner(
   verifyResult: DetectedPayment | null = mockPayment
 ): AnnouncementScanner {
@@ -30,6 +41,11 @@ function createMockScanner(
     stop: vi.fn(),
     getLastScannedBlock: vi.fn().mockReturnValue(0n),
     scanRange: vi.fn().mockResolvedValue([]),
+    getPublicClient: vi.fn().mockReturnValue({
+      getTransactionReceipt: vi.fn().mockResolvedValue({
+        logs: verifyResult ? [mockTransferLog] : [],
+      }),
+    }),
   } as unknown as AnnouncementScanner;
 }
 
@@ -103,7 +119,8 @@ describe("withStealthPayment", () => {
     // Build valid credential
     const txHash = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const credential = base64urlEncode(txHash);
-    const authHeader = `Payment id="${challenge["id"]}", credential="${credential}"`;
+    const nonce = challenge["nonce"];
+    const authHeader = `Payment id="${challenge["id"]}", credential="${credential}", nonce="${nonce}"`;
 
     const req = new Request("http://localhost/api/data", {
       headers: { Authorization: authHeader },
@@ -153,7 +170,8 @@ describe("withStealthPayment", () => {
     const credential = base64urlEncode(
       "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     );
-    const authHeader = `Payment id="${challenge["id"]}", credential="${credential}"`;
+    const nonce = challenge["nonce"];
+    const authHeader = `Payment id="${challenge["id"]}", credential="${credential}", nonce="${nonce}"`;
 
     const req = new Request("http://localhost/api/data", {
       headers: { Authorization: authHeader },
@@ -197,10 +215,12 @@ describe("createStealthMiddleware", () => {
     const req = new Request("http://localhost/api/public/data");
     const res = await mw(req);
 
-    expect(res).toBeUndefined();
+    expect(res).toBeDefined();
+    expect(res!.status).toBe(200);
+    expect(res!.headers.get("x-middleware-next")).toBe("1");
   });
 
-  it("returns undefined for valid credential on protected path", async () => {
+  it("passes through for valid credential on protected path", async () => {
     const mw = createStealthMiddleware({
       ...baseConfig,
       scanner,
@@ -217,13 +237,16 @@ describe("createStealthMiddleware", () => {
 
     const txHash = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const credential = base64urlEncode(txHash);
-    const authHeader = `Payment id="${challenge["id"]}", credential="${credential}"`;
+    const nonce = challenge["nonce"];
+    const authHeader = `Payment id="${challenge["id"]}", credential="${credential}", nonce="${nonce}"`;
 
     const req = new Request("http://localhost/api/premium/data", {
       headers: { Authorization: authHeader },
     });
     const res = await mw(req);
 
-    expect(res).toBeUndefined();
+    expect(res).toBeDefined();
+    expect(res!.status).toBe(200);
+    expect(res!.headers.get("x-middleware-next")).toBe("1");
   });
 });

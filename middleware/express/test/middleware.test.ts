@@ -23,6 +23,19 @@ const mockPayment: DetectedPayment = {
   detectedAt: new Date(),
 };
 
+// Transfer(address indexed from, address indexed to, uint256 value) event log
+// for C-MW-2 amount verification
+const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+const mockTransferLog = {
+  address: TOKEN_ADDRESS,
+  topics: [
+    TRANSFER_TOPIC,
+    "0x0000000000000000000000001111111111111111111111111111111111111111", // from
+    `0x000000000000000000000000${mockPayment.stealthAddress.slice(2)}`,  // to = stealthAddress
+  ],
+  data: `0x${AMOUNT.toString(16).padStart(64, "0")}`,
+};
+
 function createMockScanner(
   verifyResult: DetectedPayment | null = mockPayment
 ): AnnouncementScanner {
@@ -32,6 +45,11 @@ function createMockScanner(
     stop: vi.fn(),
     getLastScannedBlock: vi.fn().mockReturnValue(0n),
     scanRange: vi.fn().mockResolvedValue([]),
+    getPublicClient: vi.fn().mockReturnValue({
+      getTransactionReceipt: vi.fn().mockResolvedValue({
+        logs: verifyResult ? [mockTransferLog] : [],
+      }),
+    }),
   } as unknown as AnnouncementScanner;
 }
 
@@ -119,10 +137,11 @@ describe("createStealthPaymentMiddleware", () => {
     const challenge = parseChallenge(challengeRes.headers["www-authenticate"]);
     const paymentId = challenge["id"];
 
-    // Build a valid credential
+    // Build a valid credential (include nonce from challenge for H-TS-3 binding)
     const txHash = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const credential = base64urlEncode(txHash);
-    const authHeader = `Payment id="${paymentId}", credential="${credential}"`;
+    const nonce = challenge["nonce"];
+    const authHeader = `Payment id="${paymentId}", credential="${credential}", nonce="${nonce}"`;
 
     const res = await request(app)
       .get("/api/data")
@@ -167,7 +186,8 @@ describe("createStealthPaymentMiddleware", () => {
     const credential = base64urlEncode(
       "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     );
-    const authHeader = `Payment id="${challenge["id"]}", credential="${credential}"`;
+    const nonce = challenge["nonce"];
+    const authHeader = `Payment id="${challenge["id"]}", credential="${credential}", nonce="${nonce}"`;
 
     const res = await request(app)
       .get("/api/data")
@@ -217,7 +237,8 @@ describe("createStealthPaymentMiddleware", () => {
 
     // Send a credential that decodes to something invalid (not 0x + 64 hex chars)
     const credential = base64urlEncode("not-a-tx-hash");
-    const authHeader = `Payment id="${challenge["id"]}", credential="${credential}"`;
+    const nonce = challenge["nonce"];
+    const authHeader = `Payment id="${challenge["id"]}", credential="${credential}", nonce="${nonce}"`;
 
     const res = await request(app)
       .get("/api/data")
