@@ -229,6 +229,11 @@ export class AnnouncementScanner {
     return this.lastScannedBlock;
   }
 
+  /** Get the underlying public client (used by method.ts for transfer verification). */
+  getPublicClient(): PublicClient {
+    return this.config.publicClient;
+  }
+
   /**
    * Scan a specific block range (one-shot, no polling).
    */

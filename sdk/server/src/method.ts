@@ -1,6 +1,12 @@
 import { randomUUID } from "node:crypto";
 import type { Address, Hex } from "viem";
+import { parseAbiItem, decodeEventLog } from "viem";
 import type { AnnouncementScanner, DetectedPayment } from "./scanner.js";
+
+// ERC-20 / TIP-20 Transfer event for amount verification (C-MW-2)
+const TRANSFER_EVENT = parseAbiItem(
+  "event Transfer(address indexed from, address indexed to, uint256 value)"
+);
 
 /** The "st:eth:0x..." URI format used in the stealth-meta auth-param */
 type StealthMetaURI = `st:eth:${Hex}`;
@@ -17,6 +23,8 @@ export interface ConfidentialChargeConfig {
   amount: bigint;
   /** Challenge timeout in milliseconds (default: 30000) */
   challengeTimeoutMs?: number;
+  /** Minimum acceptable payment amount (defaults to `amount`). Set lower to tolerate rounding. */
+  minAmount?: bigint;
 }
 
 /** MPP Method implementation for confidential charge payments */
@@ -203,6 +211,56 @@ export function createConfidentialChargeMethod(
             valid: false,
             paymentId,
             error: "Payment not found or not addressed to us",
+          };
+        }
+
+        // C-MW-2: Verify TIP-20 transfer amount in the same transaction.
+        // The scanner only checks the announcement event — we must also confirm
+        // that a Transfer event to the stealth address exists with the correct
+        // token address and sufficient amount.
+        const minAmount = config.minAmount ?? config.amount;
+        const receipt =
+          await config.scanner.getPublicClient().getTransactionReceipt({
+            hash: txHash,
+          });
+
+        let transferVerified = false;
+        for (const log of receipt.logs) {
+          if (
+            log.address.toLowerCase() !==
+            config.tokenAddress.toLowerCase()
+          ) {
+            continue;
+          }
+          try {
+            const decoded = decodeEventLog({
+              abi: [TRANSFER_EVENT],
+              data: log.data,
+              topics: log.topics,
+            });
+            const args = decoded.args as {
+              from: Address;
+              to: Address;
+              value: bigint;
+            };
+            if (
+              args.to.toLowerCase() ===
+                payment.stealthAddress.toLowerCase() &&
+              args.value >= minAmount
+            ) {
+              transferVerified = true;
+              break;
+            }
+          } catch {
+            continue; // Not a Transfer event
+          }
+        }
+
+        if (!transferVerified) {
+          return {
+            valid: false,
+            paymentId,
+            error: "Token transfer amount insufficient or missing",
           };
         }
 
