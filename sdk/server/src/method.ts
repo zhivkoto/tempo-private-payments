@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Address, Hex } from "viem";
 import type { AnnouncementScanner, DetectedPayment } from "./scanner.js";
 
@@ -35,16 +36,17 @@ export interface ConfidentialChargeMethod {
     payment?: DetectedPayment;
     error?: string;
   }>;
+
+  /**
+   * Clean up resources (clear interval timers).
+   */
+  destroy(): void;
 }
 
 // ── Implementation ─────────────────────────────────────────────────────────────
 
-let challengeCounter = 0;
-
 function generatePaymentId(): string {
-  challengeCounter++;
-  const rand = Math.random().toString(36).slice(2, 6);
-  return `inv_${rand}${challengeCounter}`;
+  return `inv_${randomUUID()}`;
 }
 
 function base64urlEncode(data: string): string {
@@ -86,8 +88,11 @@ export function createConfidentialChargeMethod(
     { createdAt: number; amount: bigint }
   >();
 
+  // Track consumed transaction hashes to prevent credential replay (C-MW-1)
+  const consumedTxHashes = new Set<string>();
+
   // Clean up expired challenges periodically
-  setInterval(
+  const cleanupTimer = setInterval(
     () => {
       const now = Date.now();
       for (const [id, challenge] of activeChallenges) {
@@ -180,6 +185,16 @@ export function createConfidentialChargeMethod(
         };
       }
 
+      // C-MW-1: Reject replayed transaction hashes
+      const txHashLower = txHash.toLowerCase();
+      if (consumedTxHashes.has(txHashLower)) {
+        return {
+          valid: false,
+          paymentId,
+          error: "Transaction already consumed",
+        };
+      }
+
       // Verify the payment on-chain via scanner
       try {
         const payment = await config.scanner.verifyPayment(txHash);
@@ -190,6 +205,9 @@ export function createConfidentialChargeMethod(
             error: "Payment not found or not addressed to us",
           };
         }
+
+        // Mark tx hash as consumed to prevent replay
+        consumedTxHashes.add(txHashLower);
 
         // Clean up used challenge
         activeChallenges.delete(paymentId);
@@ -203,9 +221,13 @@ export function createConfidentialChargeMethod(
         return {
           valid: false,
           paymentId,
-          error: `Verification failed: ${err}`,
+          error: "Verification failed",
         };
       }
+    },
+
+    destroy(): void {
+      clearInterval(cleanupTimer);
     },
   };
 }

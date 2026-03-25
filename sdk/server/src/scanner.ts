@@ -109,8 +109,13 @@ function checkAnnouncement(
     return null; // Invalid ephemeral key
   }
 
-  // Compute shared secret: S' = k_view * R
+  // C-TS-3: Validate viewing private key scalar range
   const viewingPrivScalar = bytesToBigInt(viewingPrivBytes);
+  if (viewingPrivScalar === 0n || viewingPrivScalar >= secp256k1.CURVE.n) {
+    return null;
+  }
+
+  // Compute shared secret: S' = k_view * R
   const sharedPoint = ephemeralPoint.multiply(viewingPrivScalar);
   const sharedCompressed = sharedPoint.toRawBytes(true);
 
@@ -124,6 +129,11 @@ function checkAnnouncement(
 
   // s' = hash as scalar (mod n)
   const s = bytesToBigInt(sharedHash) % secp256k1.CURVE.n;
+
+  // C-TS-2: Reject degenerate zero scalar
+  if (s === 0n) {
+    return null;
+  }
 
   // K_stealth' = K_spend + s' * G
   const spendingPubBytes = hexToBytes(spendingPubKey);

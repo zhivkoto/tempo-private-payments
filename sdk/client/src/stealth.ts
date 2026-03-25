@@ -189,6 +189,11 @@ export function generateStealthAddress(
   // s = hash interpreted as scalar (mod n)
   const s = bytesToBigInt(sharedHash) % secp256k1.CURVE.n;
 
+  // C-TS-2: Reject degenerate zero scalar (stealth address would equal spending pubkey)
+  if (s === 0n) {
+    throw new Error("Degenerate shared secret scalar (zero after reduction)");
+  }
+
   // K_stealth = K_spend + s * G
   const spendingPubBytes = hexToBytes(spendingPubKey);
   const spendingPoint = secp256k1.ProjectivePoint.fromHex(spendingPubBytes);
@@ -238,8 +243,13 @@ export function checkStealthAnnouncement(
   // Parse ephemeral public key
   const ephemeralPoint = secp256k1.ProjectivePoint.fromHex(ephemeralPubBytes);
 
-  // Compute shared secret: S' = k_view * R
+  // C-TS-3: Validate viewing private key scalar range
   const viewingPrivScalar = bytesToBigInt(viewingPrivBytes);
+  if (viewingPrivScalar === 0n || viewingPrivScalar >= secp256k1.CURVE.n) {
+    return null;
+  }
+
+  // Compute shared secret: S' = k_view * R
   const sharedPoint = ephemeralPoint.multiply(viewingPrivScalar);
   const sharedCompressed = sharedPoint.toRawBytes(true);
 
@@ -254,6 +264,11 @@ export function checkStealthAnnouncement(
 
   // s' = hash as scalar (mod n)
   const s = bytesToBigInt(sharedHash) % secp256k1.CURVE.n;
+
+  // C-TS-2: Reject degenerate zero scalar
+  if (s === 0n) {
+    return null;
+  }
 
   // K_stealth' = K_spend + s' * G
   const spendingPubBytes = hexToBytes(spendingPubKey);
@@ -304,8 +319,13 @@ export function computeStealthPrivateKey(
   // Parse ephemeral public key
   const ephemeralPoint = secp256k1.ProjectivePoint.fromHex(ephemeralPubBytes);
 
-  // Compute shared secret: S = k_view * R
+  // C-TS-3: Validate key scalar ranges
   const viewingPrivScalar = bytesToBigInt(viewingPrivBytes);
+  if (viewingPrivScalar === 0n || viewingPrivScalar >= secp256k1.CURVE.n) {
+    throw new Error("Invalid viewing private key: out of scalar range");
+  }
+
+  // Compute shared secret: S = k_view * R
   const sharedPoint = ephemeralPoint.multiply(viewingPrivScalar);
   const sharedCompressed = sharedPoint.toRawBytes(true);
 
@@ -313,9 +333,17 @@ export function computeStealthPrivateKey(
   const sharedHash = keccak_256(sharedCompressed);
   const s = bytesToBigInt(sharedHash) % secp256k1.CURVE.n;
 
+  // C-TS-2: Reject degenerate zero scalar
+  if (s === 0n) {
+    throw new Error("Degenerate shared secret scalar (zero after reduction)");
+  }
+
   // k_stealth = k_spend + s mod n
   const spendingPrivBytes = hexToBytes(spendingPrivateKey);
   const kSpend = bytesToBigInt(spendingPrivBytes);
+  if (kSpend === 0n || kSpend >= secp256k1.CURVE.n) {
+    throw new Error("Invalid spending private key: out of scalar range");
+  }
   const kStealth = (kSpend + s) % secp256k1.CURVE.n;
 
   return `0x${kStealth.toString(16).padStart(64, "0")}` as Hex;
