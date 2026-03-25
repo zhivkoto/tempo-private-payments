@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { keccak_256 } from "@noble/hashes/sha3";
 import { type Hex, type Address, getAddress } from "viem";
@@ -48,6 +49,14 @@ export interface StealthPaymentInfo {
 /** Zero out a Uint8Array containing key material (H-TS-1). */
 function zeroBytes(arr: Uint8Array): void {
   arr.fill(0);
+}
+
+/** Constant-time address comparison to prevent timing side-channels (H-TS-2). */
+function addressEquals(a: string, b: string): boolean {
+  const aBuf = Buffer.from(a.slice(2).toLowerCase(), "hex");
+  const bBuf = Buffer.from(b.slice(2).toLowerCase(), "hex");
+  if (aBuf.length !== bBuf.length) return false;
+  return timingSafeEqual(aBuf, bBuf);
 }
 
 function hexToBytes(hex: Hex): Uint8Array {
@@ -302,8 +311,11 @@ export function checkStealthAnnouncement(
   const stealthPubUncompressed = stealthPoint.toRawBytes(false);
   const computedAddress = pubKeyToAddress(stealthPubUncompressed);
 
-  // Check if it matches the announced stealth address
-  if (computedAddress.toLowerCase() !== announcement.stealthAddress.toLowerCase()) {
+  // H-TS-2: Constant-time address comparison to prevent timing side-channels
+  if (!addressEquals(computedAddress, announcement.stealthAddress)) {
+    zeroBytes(viewingPrivBytes);
+    zeroBytes(sharedCompressed);
+    zeroBytes(sharedHash);
     return null;
   }
 

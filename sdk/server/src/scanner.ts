@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import {
   type Address,
   type Hex,
@@ -87,6 +88,14 @@ function pubKeyToAddress(uncompressedPubKey: Uint8Array): Address {
     .join("")}` as Address;
 }
 
+/** Constant-time address comparison to prevent timing side-channels (H-TS-2). */
+function addressEquals(a: string, b: string): boolean {
+  const aBuf = Buffer.from(a.slice(2).toLowerCase(), "hex");
+  const bBuf = Buffer.from(b.slice(2).toLowerCase(), "hex");
+  if (aBuf.length !== bBuf.length) return false;
+  return timingSafeEqual(aBuf, bBuf);
+}
+
 /**
  * Check if an announcement is addressed to us.
  * Returns DetectedPayment if match, null otherwise.
@@ -145,7 +154,8 @@ function checkAnnouncement(
   const stealthPubUncompressed = stealthPoint.toRawBytes(false);
   const computedAddress = pubKeyToAddress(stealthPubUncompressed);
 
-  if (computedAddress.toLowerCase() !== stealthAddress.toLowerCase()) {
+  // H-TS-2: Constant-time address comparison
+  if (!addressEquals(computedAddress, stealthAddress)) {
     return null;
   }
 
