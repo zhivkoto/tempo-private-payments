@@ -1,13 +1,52 @@
-.env
-.env.*
-broadcast/
-cache/
-out/
+# Dependencies
 node_modules/
-*.key
 
-sdk/rust/target/
-sdk/python/*.egg-info/
-sdk/python/pympp/__pycache__/
-sdk/python/tests/__pycache__/
-sdk/server/dist/
+# Rust
+target/
+Cargo.lock
+*.rs.bk
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+*.so
+.venv/
+venv/
+env/
+
+# TypeScript / JavaScript
+dist/
+*.js.map
+*.d.ts
+!src/**/*.d.ts
+
+# Foundry
+out/
+cache/
+broadcast/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+Thumbs.db
