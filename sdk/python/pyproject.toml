@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pympp"
+version = "0.1.0"
+description = "Python SDK for stealth address confidential payments on Tempo blockchain"
+requires-python = ">=3.10"
+dependencies = [
+    "coincurve>=20.0.0",
+    "web3>=6.0.0",
+    "pycryptodome>=3.20.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.23.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["pympp*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
