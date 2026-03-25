@@ -119,8 +119,10 @@ export function createConfidentialChargeMethod(
     buildChallenge(paymentId?: string): string {
       const id = paymentId || generatePaymentId();
 
-      // H-TS-3: Generate a per-challenge nonce for credential binding
-      const nonce = randomBytes(16).toString("hex");
+      // H-TS-3: Derive nonce via HMAC — cryptographically binds nonce to challenge ID
+      const nonce = createHmac("sha256", serverSecret)
+        .update(id)
+        .digest("hex");
 
       // Store challenge
       activeChallenges.set(id, {
@@ -182,8 +184,11 @@ export function createConfidentialChargeMethod(
         };
       }
 
-      // H-TS-3: Verify challenge nonce binding — client must return the nonce
-      if (clientNonce !== challenge.nonce) {
+      // H-TS-3: Verify challenge nonce binding — recompute HMAC to confirm
+      const expectedNonce = createHmac("sha256", serverSecret)
+        .update(paymentId)
+        .digest("hex");
+      if (clientNonce !== expectedNonce) {
         return {
           valid: false,
           paymentId,
