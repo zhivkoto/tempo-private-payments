@@ -141,6 +141,35 @@ function checkAnnouncement(
   return { stealthPrivateKey: sHex, viewTagMatched: true };
 }
 
+// ── Ring buffer for bounded metrics (H-MW-3) ────────────────────────────────
+
+class RingBuffer<T> {
+  private buffer: T[];
+  private head = 0;
+  private count = 0;
+
+  constructor(private readonly maxSize: number) {
+    this.buffer = new Array(maxSize);
+  }
+
+  push(item: T): void {
+    this.buffer[this.head] = item;
+    this.head = (this.head + 1) % this.maxSize;
+    if (this.count < this.maxSize) this.count++;
+  }
+
+  toArray(): T[] {
+    if (this.count < this.maxSize) {
+      return this.buffer.slice(0, this.count);
+    }
+    return [...this.buffer.slice(this.head), ...this.buffer.slice(0, this.head)];
+  }
+
+  get length(): number {
+    return this.count;
+  }
+}
+
 // ── ScanningService ──────────────────────────────────────────────────────────
 
 export class ScanningService {
@@ -150,10 +179,14 @@ export class ScanningService {
   private wsUnsubscribe: WatchBlockNumberReturnType | null = null;
   private isRunning = false;
   private httpServer: ServerType | null = null;
-  private detectedPayments: DetectedPayment[] = [];
+  // H-MW-3: Use ring buffers to prevent unbounded memory growth
+  private detectedPayments = new RingBuffer<DetectedPayment>(10000);
   private onPaymentCallback: ((payment: DetectedPayment) => void | Promise<void>) | null = null;
   private chainTip: bigint = 0n;
   private shutdownHandlersRegistered = false;
+
+  // H-MW-3: Ring buffer for scan latency (max 1000 entries)
+  private scanLatencyBuffer = new RingBuffer<number>(1000);
 
   metrics: ScannerMetrics = {
     scanLatencyMs: [],
@@ -215,7 +248,7 @@ export class ScanningService {
         lastScannedBlock: this.lastScannedBlock.toString(),
         chainTip: this.chainTip.toString(),
         lag: lag.toString(),
-        paymentsDetected: this.detectedPayments.length,
+        paymentsDetected: this.detectedPayments.length,  // ring buffer count
         metrics: {
           matchesFound: this.metrics.matchesFound,
           eventsProcessed: this.metrics.eventsProcessed,
@@ -320,7 +353,8 @@ export class ScanningService {
 
       const scanDuration = Date.now() - startTime;
       this.metrics.lastScanDurationMs = scanDuration;
-      this.metrics.scanLatencyMs.push(scanDuration);
+      // H-MW-3: Use ring buffer instead of unbounded array
+      this.scanLatencyBuffer.push(scanDuration);
 
       // Check MPP challenge timeout
       if (scanDuration > this.config.challengeTimeoutSec * 1000) {
@@ -465,11 +499,14 @@ export class ScanningService {
   }
 
   getDetectedPayments(): DetectedPayment[] {
-    return [...this.detectedPayments];
+    return this.detectedPayments.toArray();
   }
 
   getMetrics(): ScannerMetrics {
-    return { ...this.metrics };
+    return {
+      ...this.metrics,
+      scanLatencyMs: this.scanLatencyBuffer.toArray(),
+    };
   }
 
   getIsRunning(): boolean {
