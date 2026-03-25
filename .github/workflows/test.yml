@@ -56,12 +56,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - name: Install workspace deps
+        run: pnpm install
       - name: Express tests
-        run: cd middleware/express && npm install && npm test
+        run: cd middleware/express && pnpm test
       - name: Next.js tests
-        run: cd middleware/nextjs && npm install && npm test
+        run: cd middleware/nextjs && pnpm test
       - name: Elysia tests
-        run: cd middleware/elysia && npm install && npm test
+        run: cd middleware/elysia && pnpm test
 
   scanning-service:
     name: Scanning Service
