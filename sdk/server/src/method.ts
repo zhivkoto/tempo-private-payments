@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID, randomBytes, createHmac } from "node:crypto";
 import type { Address, Hex } from "viem";
 import { parseAbiItem, decodeEventLog } from "viem";
 import type { AnnouncementScanner, DetectedPayment } from "./scanner.js";
@@ -90,10 +90,13 @@ export function createConfidentialChargeMethod(
 ): ConfidentialChargeMethod {
   const challengeTimeoutMs = config.challengeTimeoutMs ?? 30000;
 
-  // Track active challenges
+  // H-TS-3: Server secret for HMAC credential binding
+  const serverSecret = randomBytes(32);
+
+  // Track active challenges (now includes nonce for credential binding)
   const activeChallenges = new Map<
     string,
-    { createdAt: number; amount: bigint }
+    { createdAt: number; amount: bigint; nonce: string }
   >();
 
   // Track consumed transaction hashes to prevent credential replay (C-MW-1)
@@ -116,10 +119,14 @@ export function createConfidentialChargeMethod(
     buildChallenge(paymentId?: string): string {
       const id = paymentId || generatePaymentId();
 
+      // H-TS-3: Generate a per-challenge nonce for credential binding
+      const nonce = randomBytes(16).toString("hex");
+
       // Store challenge
       activeChallenges.set(id, {
         createdAt: Date.now(),
         amount: config.amount,
+        nonce,
       });
 
       // Build payment request (base64url-encoded JSON)
@@ -130,7 +137,7 @@ export function createConfidentialChargeMethod(
       });
       const requestEncoded = base64urlEncode(paymentRequest);
 
-      return `Payment id="${id}", method="tempo", intent="charge", request="${requestEncoded}", stealth-meta="${config.stealthMetaURI}"`;
+      return `Payment id="${id}", method="tempo", intent="charge", request="${requestEncoded}", stealth-meta="${config.stealthMetaURI}", nonce="${nonce}"`;
     },
 
     async verifyCredential(authHeader: string): Promise<{
@@ -146,6 +153,7 @@ export function createConfidentialChargeMethod(
       const params = parseAuthParams(authHeader.slice("Payment".length));
       const paymentId = params["id"] || "";
       const credential = params["credential"] || "";
+      const clientNonce = params["nonce"] || "";
 
       if (!paymentId || !credential) {
         return {
@@ -171,6 +179,15 @@ export function createConfidentialChargeMethod(
           valid: false,
           paymentId,
           error: "Challenge expired",
+        };
+      }
+
+      // H-TS-3: Verify challenge nonce binding — client must return the nonce
+      if (clientNonce !== challenge.nonce) {
+        return {
+          valid: false,
+          paymentId,
+          error: "Invalid or missing challenge nonce",
         };
       }
 

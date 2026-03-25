@@ -37,4 +37,18 @@ describe("MPP Client Extension", () => {
       `Payment id="inv_7x9k", credential="base64url-tx-proof"`
     );
   });
+
+  it("should include nonce in Authorization header when provided", () => {
+    const header = buildAuthorizationHeader("inv_7x9k", "base64url-tx-proof", "abc123");
+    expect(header).toBe(
+      `Payment id="inv_7x9k", credential="base64url-tx-proof", nonce="abc123"`
+    );
+  });
+
+  it("should parse nonce from challenge", () => {
+    const wwwAuth = `Payment id="inv_7x9k", method="tempo", intent="charge", request="dGVzdA", stealth-meta="st:eth:0x${"a1".repeat(66)}", nonce="deadbeef"`;
+    const challenge = parseConfidentialChallenge(wwwAuth);
+    expect(challenge).not.toBeNull();
+    expect(challenge!.nonce).toBe("deadbeef");
+  });
 });

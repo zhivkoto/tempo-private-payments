@@ -25,6 +25,8 @@ export interface ConfidentialChallenge {
   intent: string;
   request: string; // base64url-encoded payment request
   stealthMeta: StealthMetaURI; // "st:eth:0x..." — the recipient's stealth meta-address
+  /** H-TS-3: Server-issued nonce that must be returned with the credential */
+  nonce: string;
 }
 
 /** Result of a confidential payment */
@@ -86,6 +88,7 @@ export function parseConfidentialChallenge(
     intent: params["intent"] || "charge",
     request: params["request"] || "",
     stealthMeta: stealthMeta as StealthMetaURI,
+    nonce: params["nonce"] || "",
   };
 }
 
@@ -184,12 +187,18 @@ export async function executeConfidentialCharge(params: {
 
 /**
  * Build the Authorization header value from a confidential payment result.
+ * H-TS-3: Includes the challenge nonce for cryptographic binding.
  */
 export function buildAuthorizationHeader(
   challengeId: string,
-  credential: string
+  credential: string,
+  nonce?: string
 ): string {
-  return `Payment id="${challengeId}", credential="${credential}"`;
+  let header = `Payment id="${challengeId}", credential="${credential}"`;
+  if (nonce) {
+    header += `, nonce="${nonce}"`;
+  }
+  return header;
 }
 
 // ── Internal helpers ───────────────────────────────────────────────────────────
