@@ -60,7 +60,7 @@ jobs:
         with:
           version: 9
       - name: Install workspace deps
-        run: pnpm install
+        run: pnpm install --no-frozen-lockfile
       - name: Express tests
         run: cd middleware/express && pnpm test
       - name: Next.js tests

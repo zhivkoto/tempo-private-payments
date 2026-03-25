@@ -10,12 +10,9 @@ importers:
 
   demo/agent:
     dependencies:
-      '@noble/curves':
-        specifier: ^1.8.0
-        version: 1.9.7
-      '@noble/hashes':
-        specifier: ^1.7.0
-        version: 1.8.0
+      '@cmpp/client':
+        specifier: workspace:*
+        version: link:../../sdk/client
       viem:
         specifier: ^2.25.0
         version: 2.47.6(typescript@5.9.3)(zod@3.25.76)
@@ -29,6 +26,12 @@ importers:
 
   demo/service:
     dependencies:
+      '@cmpp/client':
+        specifier: workspace:*
+        version: link:../../sdk/client
+      '@cmpp/server':
+        specifier: workspace:*
+        version: link:../../sdk/server
       '@hono/node-server':
         specifier: ^1.14.0
         version: 1.19.11(hono@4.12.9)
