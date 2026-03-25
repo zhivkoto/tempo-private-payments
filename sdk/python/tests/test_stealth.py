@@ -3,7 +3,7 @@
 import re
 
 import pytest
-from ecdsa import SECP256k1, SigningKey
+import coincurve
 from Crypto.Hash import keccak as _keccak
 
 from pympp.stealth import (
@@ -157,10 +157,8 @@ class TestStealthPrivateKey:
 
         # Verify: derive pub from private key and check address matches
         priv_bytes = bytes.fromhex(stealth_priv[2:])
-        priv_int = int.from_bytes(priv_bytes, "big")
-        sk = SigningKey.from_secret_exponent(priv_int, curve=SECP256k1)
-        vk = sk.get_verifying_key()
-        pub_uncompressed = b'\x04' + vk.to_string()
+        pub = coincurve.PublicKey.from_secret(priv_bytes)
+        pub_uncompressed = pub.format(compressed=False)
         # Address from uncompressed pub
         pub_no_prefix = pub_uncompressed[1:]
         h = _keccak256(pub_no_prefix)

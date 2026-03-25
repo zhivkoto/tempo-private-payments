@@ -57,11 +57,11 @@ jobs:
         with:
           node-version: '20'
       - name: Express tests
-        run: cd middleware/express && npm ci && npm test
+        run: cd middleware/express && npm install && npm test
       - name: Next.js tests
-        run: cd middleware/nextjs && npm ci && npm test
+        run: cd middleware/nextjs && npm install && npm test
       - name: Elysia tests
-        run: cd middleware/elysia && npm ci && npm test
+        run: cd middleware/elysia && npm install && npm test
 
   scanning-service:
     name: Scanning Service
