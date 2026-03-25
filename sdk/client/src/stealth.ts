@@ -45,6 +45,11 @@ export interface StealthPaymentInfo {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
+/** Zero out a Uint8Array containing key material (H-TS-1). */
+function zeroBytes(arr: Uint8Array): void {
+  arr.fill(0);
+}
+
 function hexToBytes(hex: Hex): Uint8Array {
   const clean = hex.startsWith("0x") ? hex.slice(2) : hex;
   const bytes = new Uint8Array(clean.length / 2);
@@ -101,10 +106,16 @@ export function generateStealthKeys(): {
   metaBytes.set(spendingPub, 0);
   metaBytes.set(viewingPub, 33);
 
-  return {
+  const result = {
     keys,
     metaAddress: bytesToHex(metaBytes) as StealthMetaAddress,
   };
+
+  // H-TS-1: Zero intermediate key material
+  zeroBytes(spendingPriv);
+  zeroBytes(viewingPriv);
+
+  return result;
 }
 
 /**
@@ -204,11 +215,18 @@ export function generateStealthAddress(
   const stealthPubUncompressed = stealthPoint.toRawBytes(false); // uncompressed (65 bytes)
   const stealthAddress = pubKeyToAddress(stealthPubUncompressed);
 
-  return {
+  const result = {
     stealthAddress,
     ephemeralPubKey: bytesToHex(ephemeralPub),
     viewTag,
   };
+
+  // H-TS-1: Zero intermediate key material
+  zeroBytes(ephemeralPriv);
+  zeroBytes(sharedCompressed);
+  zeroBytes(sharedHash);
+
+  return result;
 }
 
 /**
@@ -246,6 +264,7 @@ export function checkStealthAnnouncement(
   // C-TS-3: Validate viewing private key scalar range
   const viewingPrivScalar = bytesToBigInt(viewingPrivBytes);
   if (viewingPrivScalar === 0n || viewingPrivScalar >= secp256k1.CURVE.n) {
+    zeroBytes(viewingPrivBytes);
     return null;
   }
 
@@ -259,6 +278,9 @@ export function checkStealthAnnouncement(
   // Fast filter: check view tag
   const computedViewTag = sharedHash[0];
   if (computedViewTag !== announcement.viewTag) {
+    zeroBytes(viewingPrivBytes);
+    zeroBytes(sharedCompressed);
+    zeroBytes(sharedHash);
     return null;
   }
 
@@ -294,6 +316,11 @@ export function checkStealthAnnouncement(
   
   // We compute the stealth private key component s for later use
   const sHex = `0x${s.toString(16).padStart(64, "0")}` as Hex;
+
+  // H-TS-1: Zero intermediate key material
+  zeroBytes(viewingPrivBytes);
+  zeroBytes(sharedCompressed);
+  zeroBytes(sharedHash);
 
   return {
     stealthAddress: computedAddress,
@@ -346,7 +373,15 @@ export function computeStealthPrivateKey(
   }
   const kStealth = (kSpend + s) % secp256k1.CURVE.n;
 
-  return `0x${kStealth.toString(16).padStart(64, "0")}` as Hex;
+  const result = `0x${kStealth.toString(16).padStart(64, "0")}` as Hex;
+
+  // H-TS-1: Zero intermediate key material
+  zeroBytes(viewingPrivBytes);
+  zeroBytes(spendingPrivBytes);
+  zeroBytes(sharedCompressed);
+  zeroBytes(sharedHash);
+
+  return result;
 }
 
 // ── Utility ────────────────────────────────────────────────────────────────────
