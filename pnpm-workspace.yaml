@@ -3,3 +3,7 @@ packages:
   - "sdk/server"
   - "demo/service"
   - "demo/agent"
+  - "middleware/express"
+  - "middleware/nextjs"
+  - "middleware/elysia"
+  - "scanning-service"
