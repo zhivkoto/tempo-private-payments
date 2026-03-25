@@ -16,8 +16,8 @@ type CompressedPubKey = Hex;
 export interface DetectedPayment {
   /** Detected stealth address that matches */
   stealthAddress: Address;
-  /** Private key scalar component (needs k_spend added for full key) */
-  stealthPrivateKey: Hex;
+  /** Shared secret scalar s (needs k_spend added for full stealth private key) */
+  sharedSecretScalar: Hex;
   /** Ephemeral public key from the announcement */
   ephemeralPubKey: CompressedPubKey;
   /** Block number where the announcement was emitted */
@@ -106,7 +106,7 @@ function checkAnnouncement(
   viewTag: number,
   viewingPrivateKey: Hex,
   spendingPubKey: CompressedPubKey
-): { stealthPrivateKey: Hex } | null {
+): { sharedSecretScalar: Hex } | null {
   const viewingPrivBytes = hexToBytes(viewingPrivateKey);
   const ephemeralPubBytes = hexToBytes(ephemeralPubKeyHex);
 
@@ -160,7 +160,7 @@ function checkAnnouncement(
   }
 
   const sHex = `0x${s.toString(16).padStart(64, "0")}` as Hex;
-  return { stealthPrivateKey: sHex };
+  return { sharedSecretScalar: sHex };
 }
 
 // ── AnnouncementScanner ────────────────────────────────────────────────────────
@@ -285,7 +285,7 @@ export class AnnouncementScanner {
       if (result) {
         detected.push({
           stealthAddress,
-          stealthPrivateKey: result.stealthPrivateKey,
+          sharedSecretScalar: result.sharedSecretScalar,
           ephemeralPubKey,
           blockNumber: log.blockNumber ?? 0n,
           txHash: (log.transactionHash ?? "0x") as Hex,
@@ -344,7 +344,7 @@ export class AnnouncementScanner {
         if (result) {
           return {
             stealthAddress: args.stealthAddress,
-            stealthPrivateKey: result.stealthPrivateKey,
+            sharedSecretScalar: result.sharedSecretScalar,
             ephemeralPubKey: args.ephemeralPubKey,
             blockNumber: log.blockNumber ?? 0n,
             txHash,

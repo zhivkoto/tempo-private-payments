@@ -19,7 +19,7 @@ type CompressedPubKey = Hex;
 
 export interface DetectedPayment {
   stealthAddress: Address;
-  stealthPrivateKey: Hex;
+  sharedSecretScalar: Hex;
   ephemeralPubKey: CompressedPubKey;
   blockNumber: bigint;
   txHash: Hex;
@@ -103,7 +103,7 @@ function checkAnnouncement(
   viewTag: number,
   viewingPrivateKey: Hex,
   spendingPubKey: CompressedPubKey
-): { stealthPrivateKey: Hex; viewTagMatched: boolean } | null {
+): { sharedSecretScalar: Hex; viewTagMatched: boolean } | null {
   const viewingPrivBytes = hexToBytes(viewingPrivateKey);
   const ephemeralPubBytes = hexToBytes(ephemeralPubKeyHex);
 
@@ -138,7 +138,7 @@ function checkAnnouncement(
   }
 
   const sHex = `0x${s.toString(16).padStart(64, "0")}` as Hex;
-  return { stealthPrivateKey: sHex, viewTagMatched: true };
+  return { sharedSecretScalar: sHex, viewTagMatched: true };
 }
 
 // ── Ring buffer for bounded metrics (H-MW-3) ────────────────────────────────
@@ -416,7 +416,7 @@ export class ScanningService {
         this.metrics.matchesFound++;
         detected.push({
           stealthAddress,
-          stealthPrivateKey: result.stealthPrivateKey,
+          sharedSecretScalar: result.sharedSecretScalar,
           ephemeralPubKey,
           blockNumber: log.blockNumber ?? 0n,
           txHash: (log.transactionHash ?? "0x") as Hex,
@@ -470,7 +470,7 @@ export class ScanningService {
           this.metrics.matchesFound++;
           return {
             stealthAddress: args.stealthAddress,
-            stealthPrivateKey: result.stealthPrivateKey,
+            sharedSecretScalar: result.sharedSecretScalar,
             ephemeralPubKey: args.ephemeralPubKey,
             blockNumber: log.blockNumber ?? 0n,
             txHash,

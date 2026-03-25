@@ -109,7 +109,7 @@ class GenerateStealthAddressResult:
 @dataclass
 class StealthPaymentInfo:
     stealth_address: str
-    stealth_private_key: str  # shared secret scalar (needs k_spend added)
+    shared_secret_scalar: str  # s = keccak256(k_view * R) mod n (needs k_spend added for full key)
     ephemeral_pub_key: str
 
 
@@ -296,7 +296,7 @@ def check_stealth_announcement(
 
     return StealthPaymentInfo(
         stealth_address=computed_address,
-        stealth_private_key=s_hex,
+        shared_secret_scalar=s_hex,
         ephemeral_pub_key=announcement["ephemeralPubKey"],
     )
 

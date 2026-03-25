@@ -28,7 +28,7 @@ function createMockService(overrides: Partial<ScanningService> = {}): ScanningSe
 
 const MOCK_PAYMENT: DetectedPayment = {
   stealthAddress: "0x1234567890abcdef1234567890abcdef12345678" as Address,
-  stealthPrivateKey: "0x" + "ab".repeat(32) as Hex,
+  sharedSecretScalar: "0x" + "ab".repeat(32) as Hex,
   ephemeralPubKey: "0x" + "cd".repeat(33) as Hex,
   blockNumber: 50n,
   txHash: "0x" + "ef".repeat(32) as Hex,

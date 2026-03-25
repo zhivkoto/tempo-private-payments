@@ -38,8 +38,8 @@ export interface GenerateStealthAddressResult {
 export interface StealthPaymentInfo {
   /** Detected stealth address that matches */
   stealthAddress: Address;
-  /** Private key that controls the stealth address */
-  stealthPrivateKey: Hex;
+  /** Shared secret scalar s (needs k_spend added for full stealth private key) */
+  sharedSecretScalar: Hex;
   /** Ephemeral public key from the announcement */
   ephemeralPubKey: CompressedPubKey;
 }
@@ -336,7 +336,7 @@ export function checkStealthAnnouncement(
 
   return {
     stealthAddress: computedAddress,
-    stealthPrivateKey: sHex, // This is the shared secret scalar, needs k_spend added
+    sharedSecretScalar: sHex,
     ephemeralPubKey: announcement.ephemeralPubKey,
   };
 }

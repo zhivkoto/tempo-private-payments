@@ -13,7 +13,7 @@ const AMOUNT = 1000000n;
 
 const mockPayment: DetectedPayment = {
   stealthAddress: "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef" as Address,
-  stealthPrivateKey: "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" as Hex,
+  sharedSecretScalar: "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" as Hex,
   ephemeralPubKey: "0x02cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" as Hex,
   blockNumber: 100n,
   txHash: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as Hex,
