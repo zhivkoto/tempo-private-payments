@@ -64,7 +64,7 @@ fn regex_lite(s: &str) -> Vec<(String, String)> {
         // Skip whitespace and commas
         while chars
             .peek()
-            .map_or(false, |c| c.is_whitespace() || *c == ',')
+            .is_some_and(|c| c.is_whitespace() || *c == ',')
         {
             chars.next();
         }
@@ -77,7 +77,7 @@ fn regex_lite(s: &str) -> Vec<(String, String)> {
         let mut key = String::new();
         while chars
             .peek()
-            .map_or(false, |c| c.is_alphanumeric() || *c == '-' || *c == '_')
+            .is_some_and(|c| c.is_alphanumeric() || *c == '-' || *c == '_')
         {
             key.push(chars.next().unwrap());
         }
@@ -89,7 +89,7 @@ fn regex_lite(s: &str) -> Vec<(String, String)> {
         }
 
         // Skip whitespace
-        while chars.peek().map_or(false, |c| c.is_whitespace()) {
+        while chars.peek().is_some_and(|c| c.is_whitespace()) {
             chars.next();
         }
 
@@ -100,7 +100,7 @@ fn regex_lite(s: &str) -> Vec<(String, String)> {
         chars.next(); // consume '='
 
         // Skip whitespace
-        while chars.peek().map_or(false, |c| c.is_whitespace()) {
+        while chars.peek().is_some_and(|c| c.is_whitespace()) {
             chars.next();
         }
 
@@ -112,7 +112,7 @@ fn regex_lite(s: &str) -> Vec<(String, String)> {
 
         // Read value until closing '"'
         let mut value = String::new();
-        while chars.peek().map_or(false, |c| *c != '"') {
+        while chars.peek().is_some_and(|c| *c != '"') {
             value.push(chars.next().unwrap());
         }
 

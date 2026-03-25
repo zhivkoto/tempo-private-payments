@@ -89,7 +89,7 @@ pub fn generate_stealth_address(
     let view_tag = shared_hash[0];
 
     // 5. s = hash mod n
-    let s = <Scalar as Reduce<U256>>::reduce_bytes((&shared_hash).into());
+    let s = <Scalar as Reduce<U256>>::reduce_bytes(&shared_hash);
 
     // Reject degenerate zero scalar
     if s.is_zero().into() {
@@ -146,7 +146,7 @@ pub fn check_stealth_announcement(
     }
 
     // s = hash mod n
-    let s = <Scalar as Reduce<U256>>::reduce_bytes((&shared_hash).into());
+    let s = <Scalar as Reduce<U256>>::reduce_bytes(&shared_hash);
 
     // Reject degenerate zero scalar
     if s.is_zero().into() {
@@ -204,7 +204,7 @@ pub fn compute_stealth_private_key(
     let shared_hash = Keccak256::digest(shared_compressed.as_bytes());
 
     // s = hash mod n
-    let s = <Scalar as Reduce<U256>>::reduce_bytes((&shared_hash).into());
+    let s = <Scalar as Reduce<U256>>::reduce_bytes(&shared_hash);
 
     // Reject degenerate zero scalar
     if s.is_zero().into() {
@@ -217,11 +217,13 @@ pub fn compute_stealth_private_key(
 
     // Convert back to SecretKey
     let mut k_stealth_bytes = k_stealth.to_bytes();
-    let result = SecretKey::from_bytes((&k_stealth_bytes).into())
+    let result = SecretKey::from_bytes(&k_stealth_bytes)
         .map_err(|_| StealthError::InvalidPrivateKey);
 
     // Zeroize the intermediate bytes
-    k_stealth_bytes.as_mut_slice().zeroize();
+    for byte in k_stealth_bytes.iter_mut() {
+        *byte = 0;
+    }
 
     result
 }
