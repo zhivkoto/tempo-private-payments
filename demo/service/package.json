@@ -7,6 +7,8 @@
     "start": "tsx src/index.ts"
   },
   "dependencies": {
+    "@cmpp/client": "workspace:*",
+    "@cmpp/server": "workspace:*",
     "hono": "^4.7.0",
     "@hono/node-server": "^1.14.0",
     "viem": "^2.25.0",
